@@ -1,0 +1,854 @@
+/**
+ *
+ */
+package com.rewards.util;
+
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.Iterator;
+import java.util.Map;
+
+import javax.net.ssl.*;
+
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.json.JSONObject;
+import org.omg.CORBA.portable.UnknownException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+
+import com.rewards.exception.RewardsException;
+
+/**
+ * HttpConnectionUtil for getting the HTTP rest connections for GET/POST
+ */
+public class HttpConnectionUtil {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(HttpConnectionUtil.class);
+
+	@Bean
+	public static RestTemplate restTemplate() {
+		return new RestTemplate();
+	}
+
+	public static <T> ResponseEntity<T> makeGetRequest(final String url, final Map<String, String> httpHeaders,
+			final Class<T> responseClass) throws RewardsException {
+
+		return makeRequest(url, HttpMethod.GET, null, httpHeaders, responseClass);
+	}
+
+	public static <T, R> ResponseEntity<T> makePostRequest(final String url, final R requestBody,
+			final Map<String, String> httpHeaders, final Class<T> responseClass) throws RewardsException {
+
+		return makeRequest(url, HttpMethod.POST, requestBody, httpHeaders, responseClass);
+	}
+
+	public static <T> ResponseEntity<T> makeGetRequest(final String url, final HttpHeaders httpHeaders,
+			final Class<T> responseClass) throws RewardsException {
+
+		return makeRequest(url, HttpMethod.GET, null, httpHeaders, responseClass);
+	}
+
+	public static <T, R> ResponseEntity<T> makePostRequest(final String url, final R requestBody,
+			final HttpHeaders httpHeaders, final Class<T> responseClass) throws RewardsException {
+
+		return makeRequest(url, HttpMethod.POST, requestBody, httpHeaders, responseClass);
+	}
+
+	public static <T> ResponseEntity<T> makeGetRequestForGzip(final String url, final Map<String, String> httpHeaders,
+			final Class<T> responseClass) throws RewardsException {
+
+		return makeRequestForGzip(url, HttpMethod.GET, null, httpHeaders, responseClass);
+	}
+
+	public static <T> ResponseEntity<T> makeGetRequestForGzipGoibibo(final String url, final Map<String, String> httpHeaders,
+																	 final Class<T> responseClass) throws RewardsException {
+		return makeRequestForGzipGoibibo(url, HttpMethod.GET, null, httpHeaders, responseClass);
+	}
+
+	public static <T, R> ResponseEntity<T> makePostRequestMMT(final String url, final R requestBody,
+			final Map<String, String> httpHeaders, final Class<T> responseClass) throws RewardsException {
+
+		return makeRequestForGzipGoibibo(url, HttpMethod.POST, requestBody, httpHeaders, responseClass);
+	}
+
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private static <T, R> ResponseEntity<T> makeRequestForGzip(final String url, final HttpMethod method,
+			final R requestBody, final Map<String, String> httpHeaders, final Class<T> responseGenericType)
+			throws RewardsException {
+		ResponseEntity<T> response = null;
+		HttpEntity entity = null;
+		if (httpHeaders != null && !httpHeaders.isEmpty()) {
+			entity = new HttpEntity(requestBody, getHttpHeaders(httpHeaders));
+		} else {
+			entity = new HttpEntity(requestBody);
+		}
+		response = getHttpResponseForGzip(url, method, responseGenericType, response, entity);
+		return response;
+	}
+	private static <T, R> ResponseEntity<T> makeRequestForGzipGoibibo(final String url, final HttpMethod method, final R requestBody, final Map<String, String> httpHeaders, final Class<T> responseGenericType)
+			throws RewardsException {
+		ResponseEntity<T> response = null;
+		HttpEntity entity = null;
+		if (httpHeaders != null && !httpHeaders.isEmpty()) {
+			entity = new HttpEntity(requestBody, getHttpHeaders(httpHeaders));
+		} else {
+			entity = new HttpEntity(requestBody);
+		}
+		response = getHttpResponseForGzipGoibibo(url, method, responseGenericType, response, entity);
+		return response;
+	}
+	/**
+	 * 
+	 * Creating the request to make a http rest calls to the service provider.
+	 * 
+	 * @param url
+	 * @param method
+	 * @param requestBody
+	 * @param httpHeaders
+	 * @param responseGenericType
+	 * @return
+	 * @throws RewardsException
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private static <T, R> ResponseEntity<T> makeRequest(final String url, final HttpMethod method, final R requestBody,
+			final HttpHeaders httpHeaders, final Class<T> responseGenericType) throws RewardsException {
+		ResponseEntity<T> response = null;
+		HttpEntity entity = null;
+		if (httpHeaders != null && !httpHeaders.isEmpty()) {
+			entity = new HttpEntity(requestBody, httpHeaders);
+		} else {
+			entity = new HttpEntity(requestBody);
+		}
+
+		// LOGGER.info("URL: " + url + ", Method: " + method + ", Headers: " +
+		// httpHeaders.toString());
+		// LOGGER.info("RequestBody " + requestBody);
+		response = getHttpResponse(url, method, responseGenericType, response, entity);
+		return response;
+	}
+
+	/**
+	 * 
+	 * Creating the request to make a http rest calls to the service provider.
+	 * 
+	 * @param url
+	 * @param method
+	 * @param requestBody
+	 * @param httpHeaders
+	 * @param responseGenericType
+	 * @return
+	 * @throws RewardsException
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private static <T, R> ResponseEntity<T> makeRequest(final String url, final HttpMethod method, final R requestBody,
+			final Map<String, String> httpHeaders, final Class<T> responseGenericType) throws RewardsException {
+		ResponseEntity<T> response = null;
+		HttpEntity entity = null;
+		if (httpHeaders != null && !httpHeaders.isEmpty()) {
+			entity = new HttpEntity(requestBody, getHttpHeaders(httpHeaders));
+		} else {
+			entity = new HttpEntity(requestBody);
+		}
+		response = getHttpResponse(url, method, responseGenericType, response, entity);
+		return response;
+	}
+
+	/**
+	 * Getting the response based on the request and HTTP headers.
+	 * 
+	 * @param url
+	 * @param responseGenericType
+	 * @param response
+	 * @param entity
+	 * @return
+	 * @throws RewardsException
+	 */
+	@SuppressWarnings("rawtypes")
+	private static <T> ResponseEntity<T> getHttpResponse(final String url, final HttpMethod method,
+			final Class<T> responseGenericType, ResponseEntity<T> response, HttpEntity entity) throws RewardsException {
+
+		try {
+
+			// Todo: Skipping SSL check for the partner API in the development.
+			// Need to add partner API ssl certificate in the deployment server.
+			TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+
+				@Override
+				public void checkClientTrusted(final X509Certificate[] chain, final String authType)
+						throws CertificateException {
+
+				}
+
+				@Override
+				public void checkServerTrusted(final X509Certificate[] arg0, final String arg1)
+						throws java.security.cert.CertificateException {
+
+				}
+
+				@Override
+				public X509Certificate[] getAcceptedIssuers() {
+					return null;
+				}
+
+			} };
+
+			SSLContext sc = SSLContext.getInstance("SSL");
+			sc.init(null, trustAllCerts, new java.security.SecureRandom());
+			HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+			// Create all-trusting host name verifier
+			HostnameVerifier allHostsValid = new HostnameVerifier() {
+				@Override
+				public boolean verify(final String hostname, final SSLSession session) {
+					return true;
+				}
+			};
+			// Install the all-trusting host verifier
+			HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+			Long startTime = System.currentTimeMillis();
+			response = restTemplate().exchange(url, method, entity, responseGenericType);
+			Long endTime = System.currentTimeMillis();
+			LOGGER.info("Time taken to get Response for URL: {}, method: {} = {} ms", url, method, (endTime - startTime));
+		} catch (HttpClientErrorException httpError) {
+			LOGGER.error("RestTemplate: Failed 4" + url, url, httpError.getCause());
+			throw new RewardsException(httpError.getMessage(), httpError.getStatusCode());
+		} catch (UnknownException ue) {
+			LOGGER.error("RestTemplate: Failed 5" + url, url, ue.getCause());
+			throw new RewardsException(ue.getMessage(), HttpStatus.NOT_FOUND);
+		} catch (Exception re) {
+			LOGGER.error("RestTemplate: Failed 6" + url, url, re.getCause());
+			throw new RewardsException(re.getMessage());
+		}
+		return response;
+	}
+
+	/**
+	 * Getting the headers for making the request to call the service provider.
+	 * 
+	 * @param httpHeaders
+	 * @return
+	 */
+	@SuppressWarnings("rawtypes")
+	private static HttpHeaders getHttpHeaders(final Map<String, String> httpHeaders) {
+
+		Iterator it = httpHeaders.entrySet().iterator();
+		HttpHeaders headers = new HttpHeaders();
+		while (it.hasNext()) {
+			Map.Entry pair = (Map.Entry) it.next();
+			headers.set(pair.getKey().toString(), pair.getValue().toString());
+		}
+		return headers;
+	}
+
+	private static <T> ResponseEntity<T> getHttpResponseForGzip(final String url, final HttpMethod method,
+			final Class<T> responseGenericType, ResponseEntity<T> response, HttpEntity entity) throws RewardsException {
+		try {
+
+			// Todo: Skipping SSL check for the partner API in the development.
+			// Need to add partner API ssl certificate in the deployment server.
+			TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+
+				@Override
+				public void checkClientTrusted(final X509Certificate[] chain, final String authType)
+						throws CertificateException {
+
+				}
+
+				@Override
+				public void checkServerTrusted(final X509Certificate[] arg0, final String arg1)
+						throws java.security.cert.CertificateException {
+
+				}
+
+				@Override
+				public X509Certificate[] getAcceptedIssuers() {
+					return null;
+				}
+
+			} };
+
+			SSLContext sc = SSLContext.getInstance("SSL");
+			sc.init(null, trustAllCerts, new java.security.SecureRandom());
+			HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+			// Create all-trusting host name verifier
+			HostnameVerifier allHostsValid = new HostnameVerifier() {
+				@Override
+				public boolean verify(final String hostname, final SSLSession session) {
+					return true;
+				}
+			};
+			// Install the all-trusting host verifier
+			HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+			HttpComponentsClientHttpRequestFactory clientHttpRequestFactory = new HttpComponentsClientHttpRequestFactory(
+					HttpClientBuilder.create().build());
+			RestTemplate restTemplate = new RestTemplate(clientHttpRequestFactory);
+			Long startTime = System.currentTimeMillis();
+			response = restTemplate.exchange(url, method, entity, responseGenericType);
+			Long endTime = System.currentTimeMillis();
+			LOGGER.info("Time taken to get Response for URL: {}, method: {} = {} ms", url, method, (endTime - startTime));
+		} catch (HttpClientErrorException httpError) {
+			LOGGER.error("RestTemplate: Failed 7" + url, url, httpError.getCause());
+			throw new RewardsException(httpError.getMessage(), httpError.getStatusCode());
+		} catch (UnknownException ue) {
+			LOGGER.error("RestTemplate: Failed 8" + url, url, ue.getCause());
+			throw new RewardsException(ue.getMessage(), HttpStatus.NOT_FOUND);
+		} catch (Exception re) {
+			LOGGER.error("RestTemplate: Failed 9" + url, url, re.getCause());
+			throw new RewardsException(re.getMessage());
+		}
+		return response;
+	}
+	private static <T> ResponseEntity<T>  getHttpResponseForGzipGoibibo(final String url, final HttpMethod method, final Class<T> responseGenericType, ResponseEntity<T> response, HttpEntity entity) throws RewardsException {
+		try {
+
+			// Todo: Skipping SSL check for the partner API in the development.
+			// Need to add partner API ssl certificate in the deployment server.
+			TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+
+				@Override
+				public void checkClientTrusted(final X509Certificate[] chain, final String authType)
+						throws CertificateException {
+
+				}
+
+				@Override
+				public void checkServerTrusted(final X509Certificate[] arg0, final String arg1)
+						throws java.security.cert.CertificateException {
+
+				}
+
+				@Override
+				public X509Certificate[] getAcceptedIssuers() {
+					return null;
+				}
+
+			} };
+
+			SSLContext sc = SSLContext.getInstance("TLSv1.2");
+			sc.init(null, trustAllCerts, new java.security.SecureRandom());
+			HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+			// Create all-trusting host name verifier
+			HostnameVerifier allHostsValid = new HostnameVerifier() {
+				@Override
+				public boolean verify(final String hostname, final SSLSession session) {
+					return true;
+				}
+			};
+			// Install the all-trusting host verifier
+			HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+
+			SSLSocketFactory factory = HttpsURLConnection.getDefaultSSLSocketFactory();
+			SSLSocket socket = (SSLSocket) factory.createSocket();
+
+			String[] enableCiphers = {"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256","TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"};
+
+			socket.setEnabledCipherSuites(enableCiphers);
+
+			HttpComponentsClientHttpRequestFactory clientHttpRequestFactory = new HttpComponentsClientHttpRequestFactory(
+					HttpClientBuilder.create().build());
+			RestTemplate restTemplate = new RestTemplate(clientHttpRequestFactory);
+			Long startTime = System.currentTimeMillis();
+			response = restTemplate.exchange(url, method, entity, responseGenericType);
+			Long endTime = System.currentTimeMillis();
+			LOGGER.info("Time taken to get Response for URL: {}, method: {} = {} ms", url, method, (endTime - startTime));
+		} catch (HttpClientErrorException httpError) {
+			LOGGER.error("RestTemplate: Failed 7" + url, url, httpError.getCause());
+			throw new RewardsException(httpError.getMessage(), httpError.getStatusCode());
+		} catch (UnknownException ue) {
+			LOGGER.error("RestTemplate: Failed 8" + url, url, ue.getCause());
+			throw new RewardsException(ue.getMessage(), HttpStatus.NOT_FOUND);
+		} catch (Exception re) {
+			LOGGER.error("RestTemplate: Failed 9" + url, url, re.getCause());
+			throw new RewardsException(re.getMessage());
+		}
+		return response;
+	}
+
+//	public static Object fetch(String method, String url, String body,
+//							   Map<String, String> headers) throws IOException {
+//		//EventLogManager.getInstance().info("Search url "+ url);
+//		LOGGER.info("ENTER INTO METHOD");
+//
+//		// connection
+//		URL u = new URL(url);
+//		HttpsURLConnection conn = (HttpsURLConnection) u.openConnection();
+//		conn.setConnectTimeout(10000);
+//		conn.setReadTimeout(10000);
+//		//Setting default ssl factory
+//		LOGGER.info("ENTER INTO SSL"+url);
+//
+//
+//		conn.setSSLSocketFactory(getSSLSocketFactory());
+//		LOGGER.info("ENTER INTO SSL 2");
+//
+//		// method
+//		if (method != null) {
+//			conn.setRequestMethod(method);
+//		}
+//		LOGGER.info("ENTER INTO SSL 3"+method);
+//
+//		// headers
+//		if (headers != null) {
+//			for (String key : headers.keySet()) {
+//				conn.addRequestProperty(key, headers.get(key));
+//			}
+//		}
+//
+//		LOGGER.info("ENTER INTO SSL 4"+headers);
+//
+//		// body
+//		if (body != null) {
+//			conn.setDoOutput(true);
+//			OutputStream os = conn.getOutputStream();
+//			os.write(body.getBytes());
+//			os.flush();
+//			os.close();
+//		}
+//
+//		LOGGER.info("ENTER INTO SSL 5"+body);
+//
+//		int responseCode = conn.getResponseCode();
+//		LOGGER.info("Response code:{}",responseCode);
+//		InputStream inputStream = null;
+//
+//		if ("gzip".equalsIgnoreCase(conn.getContentEncoding())) {
+//			inputStream = conn.getResponseCode() / 100 == 2 ? new GZIPInputStream(conn.getInputStream()) : conn.getErrorStream();
+//		} else {
+//			inputStream = conn.getResponseCode() / 100 == 2 ? conn.getInputStream() : conn.getErrorStream();
+//		}
+//
+//		// response
+//		String response = readResponse(inputStream);
+//		inputStream.close();
+//		LOGGER.info("Response code:{},response:{}",responseCode,response);
+//		// handle redirects
+//		if (conn.getResponseCode() == 301) {
+//			String location = conn.getHeaderField("Location");
+//			return fetch(method, location, body, headers);
+//		}
+//		//EventLogManager.getInstance().info("response -> "+ response);
+//
+//		JSONObject responseObject = null;
+//		if (response != null && !response.isEmpty()) {
+//			responseObject = new JSONObject(response);
+//		} else {
+//			responseObject = new JSONObject();
+//			responseObject.put("error", "Partner is not responding");
+//		}
+//		LOGGER.error("Goibibo Resp HTTP: " + responseObject.toString());
+//
+//		return responseObject;
+//	}
+
+//	private static SSLSocketFactory getSSLSocketFactory() {
+//		SSLSocketFactory sslSocketFactory = null;
+//		try {
+//
+//			TrustManager[] trustAllCerts = new TrustManager[]{
+//					new X509TrustManager() {
+//
+//						public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+//							return null;
+//						}
+//
+//						public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+//							//No need to implement.
+//						}
+//
+//						public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+//							//No need to implement.
+//						}
+//					}
+//			};
+//
+//			SSLContext sc = SSLContext.getInstance("SSL");
+//			sc.init(null, trustAllCerts, new java.security.SecureRandom());
+//			sslSocketFactory = sc.getSocketFactory();
+//
+//		} catch (Exception e) {
+//			//logger.error("Exception in ssl socket factory ", e);
+//		}
+//
+//		return sslSocketFactory;
+//	}
+
+//	private static String readResponse(InputStream in) {
+//		BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+//		String inputLine;
+//		StringBuilder builder = new StringBuilder();
+//		try {
+//			while ((inputLine = reader.readLine()) != null) {
+//				builder.append(inputLine);
+//			}
+//		} catch (IOException e) {
+//			throw new CTRunTimeException(e);
+//		}
+//		return builder.toString();
+//	}
+
+}
+
+
+
+
+
+SECOND >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+package com.rewards.util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
+
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+/**
+ * DateUtil class is used to parse different date formats for the application
+ *
+ */
+public class DateUtil {
+
+	private final static Logger LOGGER = LoggerFactory.getLogger(DateUtil.class);
+
+	public static final long TIME_DIFFENRCE = 60 * 1000 * 30;
+
+	public static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat("yyyy-MM-dd");
+	public static final SimpleDateFormat DATE_FORMAT_YYYYMMDD = new SimpleDateFormat("yyyyMMdd");
+
+	public static final String DATE_FORMAT_TIME = "dd-MM-yyyy HH:mm:ss";
+	public static final String DATE_FORMAT = "yyyy-MM-dd";
+	public static String format(final Date date, final SimpleDateFormat dateFormat) {
+		return dateFormat.format(date);
+	}
+
+	/**
+	 * Getting the Date by passing the string date
+	 * 
+	 * @param dateString
+	 * @return
+	 */
+	public static Date stringToDate(final String dateString) {
+		DateFormat df = new SimpleDateFormat("yyyy-mm-dd");
+		try {
+			return df.parse(dateString);
+		} catch (ParseException e) {
+			LOGGER.error(e.getMessage(), e);
+			return null;
+		}
+	}
+
+	/**
+	 * Getting the formatted date by passing the departure and arrival date for
+	 * yatra service.
+	 * 
+	 * @param ds
+	 * @return
+	 */
+	public static String formatDateString(final String ds) {
+		if (StringUtils.isEmpty(ds)) {
+			return null;
+		}
+		DateFormat df = new SimpleDateFormat("yyyy-mm-dd");
+		DateFormat df2 = new SimpleDateFormat("dd/mm/yyyy");
+		Date startDate;
+		try {
+			startDate = df.parse(ds);
+			return df2.format(startDate);
+		} catch (ParseException e) {
+			LOGGER.error(e.getMessage(), e);
+			return null;
+		}
+	}
+
+	/**
+	 * Getting the formatted date by passing the departure and arrival date for
+	 * calendar service.
+	 * 
+	 * @param ds
+	 * @return
+	 */
+	public static String formatCalendarDateString(final String ds) {
+		if (StringUtils.isEmpty(ds)) {
+			return null;
+		}
+		DateFormat df = new SimpleDateFormat("yyyyMMdd");
+		DateFormat df2 = new SimpleDateFormat("dd-MM-yyyy");
+		Date startDate;
+		try {
+			startDate = df.parse(ds);
+			return df2.format(startDate);
+		} catch (ParseException e) {
+			LOGGER.error(e.getMessage(), e);
+			return null;
+		}
+	}
+
+	/**
+	 * Add days when passing the count for batch jobs
+	 * 
+	 * @param date
+	 * @param days
+	 * @return
+	 */
+	public static Date addDays(final Date date, final int days) {
+		Calendar c = Calendar.getInstance();
+		c.setTime(date);
+		c.add(Calendar.DATE, days);
+		return c.getTime();
+	}
+
+	/**
+	 * Getting number of days by passing the month
+	 * 
+	 * @param numberOfDays
+	 * @return
+	 */
+
+	public static List<String> getDaysForMonth(final int numberOfDays) {
+
+		List<String> listofDays = new ArrayList<>();
+		Calendar cal = Calendar.getInstance();
+		int addDailyCount = 1; 
+		for (int index = 1; index <= numberOfDays; index++) {
+			cal.add(Calendar.DATE, addDailyCount);
+			listofDays.add(DATE_FORMAT_YYYYMMDD.format(cal.getTime()));
+		}
+		return listofDays;
+	}
+
+	/**
+	 * Getting current date and time for deleting the older records in DB
+	 * 
+	 * @param
+	 * @return
+	 */
+	public static String getCurrentDateTime() {
+		DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_TIME);
+		Date date = new Date();
+		return dateFormat.format(date);
+	}
+
+		
+	/**
+	 * Getting current date minus the minutes configurable in properties
+	 * 
+	 * @param
+	 * @return
+	 */
+	public static String getPastDateByInterval(int minutes) {
+		Calendar cal = Calendar.getInstance();
+		Date currentDate = new Date();
+		cal.setTime(currentDate);
+		cal.add(Calendar.MINUTE, -minutes);
+		Date oneHourBack = cal.getTime();
+		DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_TIME);
+		return dateFormat.format(oneHourBack);
+	}
+
+	public static Date covertStringToDate(String date) throws ParseException {
+		Date createdDate=new SimpleDateFormat(DATE_FORMAT_TIME).parse(date);
+		return createdDate;  
+	}
+
+	public static long daysCount(String checkIn, String checkOut) {
+		long noOfdays = 0;
+		try {
+			Date startDate = new SimpleDateFormat(DATE_FORMAT).parse(checkIn);
+			Date endDate = new SimpleDateFormat(DATE_FORMAT).parse(checkOut);
+			long difference = Math.abs(endDate.getTime() - startDate.getTime());
+			noOfdays = difference / (24 * 60 * 60 * 1000);
+		} catch (ParseException e) {
+			LOGGER.error("Exception while parsing date", e.getMessage());
+		}
+
+		return noOfdays;
+
+	}
+
+	public static Long formatDateToEpoc(final String ds) {
+		if (StringUtils.isEmpty(ds)) {
+			return null;
+		}
+		DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+		df.setTimeZone(TimeZone.getTimeZone("GMT"));
+
+		Date date;
+		try {
+			date = df.parse(ds);
+			return date.getTime()/1000;
+
+		} catch (Exception e) {
+			LOGGER.error(e.getMessage(), e);
+			return null;
+		}
+	}
+}
+THIRD >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+package com.rewards.util;
+
+public class DistanceUtil {
+    public  double distance(double lat1, double lon1, double lat2, double lon2, String unit) {
+        double theta = lon1 - lon2;
+        double dist = Math.sin(deg2rad(lat1)) * Math.sin(deg2rad(lat2)) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.cos(deg2rad(theta));
+        dist = Math.acos(dist);
+        dist = rad2deg(dist);
+        dist = dist * 60 * 1.1515;
+        if (unit == "K") {
+            dist = dist * 1.609344;
+        } else if (unit == "N") {
+            dist = dist * 0.8684;
+        }
+
+        return (dist);
+    }
+
+    /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+    /*::	This function converts decimal degrees to radians						 :*/
+    /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+    private  double deg2rad(double deg) {
+        return (deg * Math.PI / 180.0);
+    }
+
+    /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+    /*::	This function converts radians to decimal degrees						 :*/
+    /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+    private  double rad2deg(double rad) {
+        return (rad * 180 / Math.PI);
+    }
+}
+FOURTH >>>>>>>>>>>>>>>>>>
+package com.rewards.services;
+
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+
+/**
+ * Redis Service is used to store and retrieve the cache results 
+ * from redis server.
+ */
+@Service
+public class RedisService {
+
+	@Value("${expire.time}")
+	private long expireTime;
+	
+	@Autowired
+	private RedisTemplate<String, Object> redisTemplate;
+
+	public Object getValue(final String key) {
+		return this.redisTemplate.opsForValue().get(key);
+	}
+
+	public void setValue(final String key, final Object value) {
+		this.redisTemplate.opsForValue().set(key, value);
+
+		// set a expire for a message
+		this.redisTemplate.expire(key, expireTime, TimeUnit.MINUTES);
+	}
+
+	public Object getListValues() {
+		return this.redisTemplate.keys("*");
+	}
+	
+	public void deleteKey(String docKey) {
+		this.redisTemplate.delete(docKey);
+	}
+
+}
+FIFTH >>>>>>>>>>>>
+private JSONObject getBaggageInformationPost(String str, String input) {
+
+		JSONObject response = null;
+		try {
+
+			URL url = new URL(str);
+
+
+			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn.setDoOutput(true);
+			StringBuilder output = new StringBuilder();
+			BufferedReader in = null;
+			conn.setRequestMethod("POST");
+			conn.setRequestProperty("Content-Type", "application/json");
+			conn.setRequestProperty("X-CT-API-KEY", yamlConfig.getCleartripflightkey());
+			conn.setRequestProperty("X-CT-SOURCETYPE", "B2C");
+			conn.setRequestProperty("Accept-Encoding", "gzip,deflate");
+
+
+			OutputStream os = conn.getOutputStream();
+			if (input != null) {
+				os.write(input.getBytes());
+			}
+
+			os.flush();
+
+			LOGGER.info("Response Code -- {} ", conn.getResponseCode());
+			LOGGER.info("Response Code -- {} ",os.toString() );
+
+			String inputLine;
+			if (conn.getHeaderField("Content-Encoding") != null
+					&& conn.getHeaderField("Content-Encoding").equals("gzip")) {
+				in = new BufferedReader(new InputStreamReader(new GZIPInputStream(conn.getInputStream())));
+			} else {
+				in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+			}
+
+
+				 while ((inputLine = in.readLine()) != null) {
+
+				output.append(inputLine);
+			}
+
+			response = new JSONObject();
+			//response.put("httpcode", conn.getResponseCode());
+			while ((inputLine = in.readLine()) != null) {
+				output.append(inputLine);
+			}
+
+			response.put("error_code", conn.getResponseCode());
+			response.put("error_message", output.toString());
+
+
+			LOGGER.info(response.toString());
+
+			conn.disconnect();
+
+		} catch (java.net.SocketTimeoutException se) {
+			LOGGER.error("SocketTimeoutException: Failed " + str, str, se.getCause());
+			response = new JSONObject();
+			response.put("error_message", FlightItineraryConstants.HTTP_GATEWAY_TIMEOUT_MESSAGE);
+			response.put("error_code", FlightItineraryConstants.HTTP_GATEWAY_TIMEOUT);
+		} catch (UnknownException ue) {
+			LOGGER.error("UnknownException: Failed " + str, str, ue.getCause());
+			response = new JSONObject();
+			response.put("error_message", "URL Not Found");
+			response.put("error_code", FlightItineraryConstants.HTTP_NOT_FOUND);
+		} catch (Exception re) {
+			re.printStackTrace();
+			LOGGER.error("Exception: Failed " + str, str, re.getCause());
+			response = new JSONObject();
+			response.put("error_message", FlightItineraryConstants.HTTP_INTERNAL_ERROR_MESSAGE);
+			response.put("error_code", FlightItineraryConstants.HTTP_INTERNAL_ERROR);
+		}
+		LOGGER.info("ClearTripFlightBaggageInformation.java >response "+response.toString());
+		return response;
+	}
+
